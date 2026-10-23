@@ -1,0 +1,66 @@
+services:
+  app-schema:
+    image: postgres:17.6-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Run ./scripts/deploy.sh to generate .env secrets}
+      PGCONNECT_TIMEOUT: 5
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../../supabase/schema.sql:/schema/schema.sql:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        attempt=0
+        until pg_isready -q -h db -p 5432 -U postgres -d postgres; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 60 ]; then
+            echo "Postgres did not become reachable within 120 seconds." >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        if [ "$$(psql -h db -U postgres -d postgres -Atc "select to_regclass('public.campaigns')")" = "campaigns" ]; then
+          echo "App schema already installed; leaving existing data unchanged."
+        else
+          psql -v ON_ERROR_STOP=1 -h db -U postgres -d postgres -f /schema/schema.sql
+        fi
+
+  app:
+    image: sorte-de-casa:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Set NEXT_PUBLIC_SUPABASE_URL in .env}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Run ./scripts/deploy.sh to generate .env secrets}
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      SUPABASE_INTERNAL_URL: ${SUPABASE_INTERNAL_URL:-http://api-gw:8000}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api-gw:
+        condition: service_healthy
+      app-schema:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

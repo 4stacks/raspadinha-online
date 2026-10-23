@@ -8,7 +8,7 @@ Aplicação promocional de raspadinha online, gratuita para participantes, com e
 - Supabase Auth e PostgreSQL
 - Service worker para instalação e shell offline; jogar e resgatar exigem conexão
 
-## Configuração local
+## Desenvolvimento local com Supabase hospedado
 
 1. Crie um projeto Supabase.
 2. No SQL Editor do Supabase, execute [`supabase/schema.sql`](./supabase/schema.sql).
@@ -50,6 +50,13 @@ Em produção, configure essas variáveis também no ambiente de build do Next.j
 - Configure HTTPS e domínios permitidos no Supabase Auth. Teste políticas de acesso e restauração de dados antes de produção.
 - Defina termos, regras completas da promoção, canal e prazo de entrega, fundamento legal e retenção/exclusão dos dados pessoais com a assessoria apropriada. O MVP não envia brindes nem substitui revisão jurídica.
 - O service worker não armazena endpoints de campanha, jogadas ou dados pessoais. A jogada e o resgate não funcionam offline.
+
+## Deploy
+
+O deploy com Docker Compose inclui a aplicação, Supabase self-hosted e PostgreSQL.
+Consulte o guia completo de configuração do `.env`, primeiro deploy,
+administrador, backups, atualização e segurança em
+[`DEPLOY.md`](./DEPLOY.md). O stack inicia com `./scripts/deploy.sh`.
 
 ## Validação
 
